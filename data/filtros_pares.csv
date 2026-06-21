@@ -1,0 +1,61 @@
+Filtro,Orden,Etapa,FSF,Q
+Butterworth,2,1,1.0,0.7071
+Butterworth,4,1,1.0,0.5412
+Butterworth,4,2,1.0,1.3065
+Butterworth,6,1,1.0,0.5177
+Butterworth,6,2,1.0,0.7071
+Butterworth,6,3,1.0,1.932
+Butterworth,8,1,1.0,0.5098
+Butterworth,8,2,1.0,0.6013
+Butterworth,8,3,1.0,0.8999
+Butterworth,8,4,1.0,2.5628
+Butterworth,10,1,1.0,0.5062
+Butterworth,10,2,1.0,0.5612
+Butterworth,10,3,1.0,0.7071
+Butterworth,10,4,1.0,1.1013
+Butterworth,10,5,1.0,3.1969
+Bessel,2,1,1.2736,0.5773
+Bessel,4,1,1.4192,0.5219
+Bessel,4,2,1.5912,0.8055
+Bessel,6,1,1.606,0.5103
+Bessel,6,2,1.6913,0.6112
+Bessel,6,3,1.9071,1.0234
+Bessel,8,1,1.7837,0.506
+Bessel,8,2,2.1953,1.2258
+Bessel,8,3,1.9591,0.7109
+Bessel,8,4,1.8376,0.5596
+Bessel,10,1,1.949,0.504
+Bessel,10,2,1.987,0.538
+Bessel,10,3,2.068,0.62
+Bessel,10,4,2.211,0.81
+Bessel,10,5,2.485,1.415
+1-dB Chebyshev,2,1,1.05,0.9565
+1-dB Chebyshev,4,1,0.5286,0.7845
+1-dB Chebyshev,4,2,0.9932,3.56
+1-dB Chebyshev,6,1,0.3532,0.7608
+1-dB Chebyshev,6,2,0.7468,2.1977
+1-dB Chebyshev,6,3,0.9953,8.0012
+1-dB Chebyshev,8,1,0.2651,0.753
+1-dB Chebyshev,8,2,0.5838,1.9564
+1-dB Chebyshev,8,3,0.5538,2.7776
+1-dB Chebyshev,8,4,0.9971,14.2445
+1-dB Chebyshev,10,1,0.2121,0.7495
+1-dB Chebyshev,10,2,0.476,1.8639
+1-dB Chebyshev,10,3,0.7214,3.5609
+1-dB Chebyshev,10,4,0.9024,6.9419
+1-dB Chebyshev,10,5,0.9981,22.2779
+3-dB Chebyshev,2,1,0.8414,1.3049
+3-dB Chebyshev,4,1,0.4426,1.0765
+3-dB Chebyshev,4,2,0.9503,5.577
+3-dB Chebyshev,6,1,0.298,1.0441
+3-dB Chebyshev,6,2,0.7224,3.4597
+3-dB Chebyshev,6,3,0.9771,12.7899
+3-dB Chebyshev,8,1,0.2228,1.0558
+3-dB Chebyshev,8,2,0.5665,3.0789
+3-dB Chebyshev,8,3,0.8388,6.8302
+3-dB Chebyshev,8,4,0.987,22.8481
+3-dB Chebyshev,10,1,0.1796,1.0289
+3-dB Chebyshev,10,2,0.4626,2.935
+3-dB Chebyshev,10,3,0.7126,5.7012
+3-dB Chebyshev,10,4,0.8954,11.1646
+3-dB Chebyshev,10,5,0.9916,35.9274
