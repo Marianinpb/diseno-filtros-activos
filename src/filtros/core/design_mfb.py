@@ -79,6 +79,8 @@ def calc_m(n_cap_ratio: float, q: float) -> float:
     """
     if q == 0:
         raise DesignError("Q = 0 no es válido")
+    if n_cap_ratio <= 1.0:
+        raise DesignError(f"n debe ser > 1 para estabilidad: n={n_cap_ratio}")
 
     n = n_cap_ratio
     disc = n**2 - 8 * n * q**2  # discriminante
@@ -94,10 +96,36 @@ def calc_m(n_cap_ratio: float, q: float) -> float:
 
     m_val = (n - 4 * q**2 + math.sqrt(disc)) / denom
 
-    if m_val <= 0:
-        raise DesignError(f"m no positivo: m={m_val}")
+    if m_val <= 1.0:
+        raise DesignError(f"m debe ser > 1 para estabilidad: m={m_val}")
 
     return m_val
+
+
+def calc_m_hp(n_cap_ratio: float, q: float) -> float:
+    """
+    MFB High-Pass (ganancia unitaria -K = -1, C1 = C2 = C_chico, C3 = n * C_chico):
+    Q = sqrt(m * n) / (n + 2)  =>  m = Q^2 * (n + 2)^2 / n
+    """
+    if q <= 0:
+        raise DesignError("Q debe ser > 0")
+    if n_cap_ratio <= 1.0:
+        raise DesignError(f"n debe ser > 1 para estabilidad: n={n_cap_ratio}")
+
+    n = n_cap_ratio
+    m_val = (q**2 * (n + 2.0) ** 2) / n
+    if m_val <= 1.0:
+        raise DesignError(f"m_hp debe ser > 1 para estabilidad: m={m_val}")
+    return m_val
+
+
+def calc_m_bp(n_cap_ratio: float, q: float) -> float:
+    """
+    MFB Band-Pass (ganancia central unitaria, parametrización m y n de TI):
+    Usa la misma relación cuadrática m(n, q) que MFB Low-Pass.
+    """
+    return calc_m(n_cap_ratio, q)
+
 
 
 def calc_r_min(
@@ -118,10 +146,10 @@ def calc_r_min(
         raise DesignError(f"C_chico no positivo: C={c_small}")
     if fsf <= 0:
         raise DesignError(f"fsf no positivo: fsf={fsf}")
-    if m <= 0:
-        raise DesignError(f"m no positivo: m={m}")
-    if n_cap_ratio <= 0:
-        raise DesignError(f"n_cap_ratio no positivo: n={n_cap_ratio}")
+    if m <= 1.0:
+        raise DesignError(f"m debe ser > 1 para estabilidad: m={m}")
+    if n_cap_ratio <= 1.0:
+        raise DesignError(f"n_cap_ratio debe ser > 1 para estabilidad: n={n_cap_ratio}")
     if f0_hz <= 0:
         raise DesignError(f"f0 no positivo: f0={f0_hz}")
 
@@ -145,6 +173,7 @@ def disenar_etapa_mfb(
     fsf: float,
     q: float,
     f0_hz: float,
+    respuesta: str = "Low-Pass",
 ):
     """
     Diseña una etapa MFB usando tus fórmulas m() y r().
@@ -155,6 +184,7 @@ def disenar_etapa_mfb(
         fsf         : factor de frecuencia efectiva (de la tabla TI)
         q           : Q de la etapa
         f0_hz       : frecuencia de la etapa (Hz) = fc_global * fsf
+        respuesta   : "Low-Pass", "High-Pass", "Band-Pass"
 
     Devuelve:
         dict con:
@@ -163,7 +193,13 @@ def disenar_etapa_mfb(
             (si invalid): reason
     """
     try:
-        m_val = calc_m(n_cap_ratio, q)
+        if respuesta == "High-Pass":
+            m_val = calc_m_hp(n_cap_ratio, q)
+        elif respuesta == "Band-Pass":
+            m_val = calc_m_bp(n_cap_ratio, q)
+        else:
+            m_val = calc_m(n_cap_ratio, q)
+
         r_min = calc_r_min(c_small, fsf, m_val, n_cap_ratio, f0_hz)
         r_max = m_val * r_min
         c_big = n_cap_ratio * c_small
@@ -179,6 +215,7 @@ def disenar_etapa_mfb(
             "f0_hz": f0_hz,
             "fsf": fsf,
             "n_cap_ratio": n_cap_ratio,
+            "respuesta": respuesta,
         }
     except DesignError as e:
         return {
@@ -188,6 +225,7 @@ def disenar_etapa_mfb(
             "f0_hz": f0_hz,
             "fsf": fsf,
             "n_cap_ratio": n_cap_ratio,
+            "respuesta": respuesta,
         }
 
 
@@ -202,6 +240,7 @@ def disenar_filtro_mfb(
     c_small: float,
     n_cap_ratio: float,
     path_csv: str = "data/filtros_pares.csv",
+    respuesta: str = "Low-Pass",
 ):
     """
     Diseña TODAS las etapas MFB de un filtro dado.
@@ -213,6 +252,7 @@ def disenar_filtro_mfb(
         c_small      : C_chico que quieres usar (F)
         n_cap_ratio  : C_grande / C_chico
         path_csv     : ruta al archivo filtros_pares.csv
+        respuesta    : "Low-Pass", "High-Pass", "Band-Pass"
 
     Devuelve:
         lista de dicts, uno por etapa.
@@ -227,8 +267,8 @@ def disenar_filtro_mfb(
         raise ValueError("orden debe ser par")
     if c_small <= 0:
         raise ValueError("c_small debe ser > 0")
-    if n_cap_ratio <= 0:
-        raise ValueError("n_cap_ratio debe ser > 0")
+    if n_cap_ratio <= 1.0:
+        raise ValueError("n_cap_ratio debe ser > 1")
 
     cargar_tablas(path_csv)
 
@@ -236,7 +276,7 @@ def disenar_filtro_mfb(
     etapas_resultado = []
 
     for e in etapas_tabla:
-        fsf = e.fsf
+        fsf = 1.0 / e.fsf if respuesta == "High-Pass" else e.fsf
         q = e.q
         f0_etapa = fc_global_hz * fsf
 
@@ -246,6 +286,7 @@ def disenar_filtro_mfb(
             fsf=fsf,
             q=q,
             f0_hz=f0_etapa,
+            respuesta=respuesta,
         )
 
         etapa["etapa"] = e.etapa

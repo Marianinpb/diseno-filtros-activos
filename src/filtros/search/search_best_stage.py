@@ -1,4 +1,11 @@
 import math
+import sys
+from pathlib import Path
+
+_SRC_DIR = str(Path(__file__).resolve().parents[2])
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
+
 from filtros.data.inventario_yaml import cargar_inventario_desde_yaml
 from filtros.core.design_mfb import calc_m, calc_r_min, DesignError
 
@@ -31,14 +38,19 @@ def buscar_mejor_combinacion_para_etapa(q, fsf, f0_hz, path_yaml="data/valores.y
     mejor_error = math.inf
 
     for i, Csmall in enumerate(capacitores):
-        for Cbig in capacitores[i:]:
-            n = Cbig / Csmall  # n_cap_ratio
+        for Cbig in capacitores[i + 1 :]:
+            n = Cbig / Csmall  # n_cap_ratio > 1
+            if n <= 1.0:
+                continue
 
             # 1) Ver región de realizabilidad (discriminante)
             try:
                 m_val = calc_m(n, q)
             except DesignError:
                 continue  # este par (Csmall,Cbig) no sirve
+
+            if m_val <= 1.0:
+                continue
 
             # 2) Calcular Rmin ideal para esta combinacion
             try:

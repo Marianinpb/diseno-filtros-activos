@@ -29,8 +29,9 @@ def generar_bode_mfb_real_bytes(etapas, fc_global_hz, tipo_filtro, orden):
         Rmax = e["Rmax_real"]
         Csmall = e["Csmall"]
         Cbig = e["Cbig"]
+        resp_e = e.get("respuesta", "Low-Pass")
 
-        sys_i = transfer_func_etapa_real(Rmax, Rmin, Csmall, Cbig)
+        sys_i = transfer_func_etapa_real(Rmax, Rmin, Csmall, Cbig, respuesta=resp_e, m=e.get("m"))
         num_total = np.polymul(num_total, np.array(sys_i.num))
         den_total = np.polymul(den_total, np.array(sys_i.den))
 
@@ -58,7 +59,35 @@ def generar_bode_mfb_real_bytes(etapas, fc_global_hz, tipo_filtro, orden):
     return base64.b64encode(buf.read()).decode()
 
 
-def transfer_func_etapa_real(Rmax, Rmin, Csmall, Cbig):
+def transfer_func_etapa_real(Rmax, Rmin, Csmall, Cbig, respuesta="Low-Pass", m=None):
+    if respuesta == "High-Pass":
+        # MFB High-Pass con C1 = C2 = Csmall, C3 = Cbig
+        C1 = Csmall
+        C2 = Csmall
+        C3 = Cbig
+        if m is not None and m < 1.0:
+            R1, R2 = Rmax, Rmin
+        else:
+            R1, R2 = Rmin, Rmax
+        a2 = R1 * R2 * C2 * C3
+        a1 = R1 * (C1 + C2 + C3)
+        a0 = 1.0
+        num = [-R1 * R2 * C1 * C3, 0.0, 0.0]
+        den = [a2, a1, a0]
+        return signal.TransferFunction(num, den)
+    elif respuesta == "Band-Pass":
+        R1 = Rmax
+        R2 = Rmax
+        R3 = Rmin
+        C1 = Csmall
+        C2 = Cbig
+        a2 = R2 * R3 * C1 * C2
+        a1 = R3 * C1 + R2 * C1 + (R2 * R3 * C1 / R1)
+        a0 = 1.0
+        num = [0.0, -a1, 0.0]
+        den = [a2, a1, a0]
+        return signal.TransferFunction(num, den)
+
     R1 = Rmax
     R2 = Rmax
     R3 = Rmin

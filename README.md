@@ -5,13 +5,16 @@ Aplicación interactiva para el diseño de **filtros activos analógicos** — M
 ## Características
 
 - **Dos topologías**: MFB y Sallen-Key (ganancia unitaria)
+- **Respuestas soportadas**: Low-Pass, High-Pass, Band-Pass (etapas de 2º orden) y Band-Pass en cascada (HP + LP)
 - **Cuatro tipos de filtro**: Butterworth, Bessel, Chebyshev 1-dB y 3-dB
 - **Órdenes pares**: 2, 4, 6, 8 y 10
-- **Optimización por inventario**: búsqueda exhaustiva de la mejor combinación de resistencias y capacitores reales (desde archivo YAML)
+- **Optimización por inventario**: búsqueda exhaustiva de la mejor combinación de resistencias y capacitores reales (desde archivo YAML) con restricción de estabilidad ($n > 1$ y $m > 1$)
 - **Gráfica Bode**: magnitud ideal calculada desde las tablas TI, renderizada en tiempo real
 - **Interfaz oscura moderna**: construida con [Flet](https://flet.dev), tema dark con paleta indigo
 
 ## Instalación
+
+### Windows (PowerShell)
 
 ```powershell
 # Clonar el repositorio
@@ -26,18 +29,68 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+### macOS / Linux (Terminal: zsh / bash)
+
+```bash
+# Clonar el repositorio
+git clone https://github.com/Marianinpb/diseno-filtros-activos.git
+cd diseno-filtros-activos
+
+# Crear entorno virtual (Python 3.10+)
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Instalar dependencias
+pip install -r requirements.txt
+```
+
+## Actualizar el repositorio (si ya lo habías clonado)
+
+Si ya tienes el proyecto descargado y quieres bajar los últimos cambios de GitHub:
+
+```bash
+git pull origin master
+```
+
 ## Uso
 
-**Opción 1 — Doble clic (Windows)**
+### 1. Con scripts de inicio automático
 
-Ejecutar `run.bat`
-
-**Opción 2 — Línea de comandos**
-
+**Windows (doble clic o consola):**
 ```powershell
+.\run.bat
+```
+
+**macOS / Linux (Terminal):**
+```bash
+chmod +x run.sh
+./run.sh
+```
+
+---
+
+### 2. Inicio manual desde terminal (sin los scripts)
+
+**En Windows (PowerShell):**
+```powershell
+# 1. Activar el entorno virtual
+.venv\Scripts\activate
+
+# 2. Definir PYTHONPATH y ejecutar la app
 $env:PYTHONPATH = "src"
 python src/filtros/ui/main_flet.py
 ```
+
+**En macOS / Linux (`zsh` o `bash`):**
+```bash
+# 1. Activar el entorno virtual
+source .venv/bin/activate
+
+# 2. Definir PYTHONPATH y ejecutar la app
+export PYTHONPATH="src"
+python3 src/filtros/ui/main_flet.py
+```
+*(O en una sola línea en macOS/Linux: `PYTHONPATH=src python3 src/filtros/ui/main_flet.py`).*
 
 **Parámetros de entrada:**
 
@@ -83,6 +136,7 @@ diseno-filtros-activos/
 │   └── bode_ideal.png            # Ejemplo de gráfica Bode
 ├── requirements.txt              # Dependencias Python
 ├── run.bat                       # Launcher Windows
+├── run.sh                        # Launcher macOS / Linux
 └── README.md
 ```
 

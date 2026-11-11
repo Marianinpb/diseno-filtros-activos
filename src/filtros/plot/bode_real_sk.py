@@ -6,12 +6,33 @@ import matplotlib.pyplot as plt
 from scipy import signal
 
 
-def transfer_func_etapa_sk(Rmax, Rmin, Csmall, Cbig):
-    """Sallen-Key unity-gain low-pass transfer function.
+def transfer_func_etapa_sk(Rmax, Rmin, Csmall, Cbig, respuesta="Low-Pass", m=None):
+    """Sallen-Key unity-gain transfer function."""
+    if respuesta == "High-Pass":
+        C1 = Csmall
+        C2 = Cbig
+        if m is not None and m < 1.0:
+            R1, R2 = Rmax, Rmin
+        else:
+            R1, R2 = Rmin, Rmax
+        a2 = R1 * R2 * C1 * C2
+        a1 = R1 * (C1 + C2)
+        a0 = 1.0
+        num = [a2, 0.0, 0.0]
+        den = [a2, a1, a0]
+        return signal.TransferFunction(num, den)
+    elif respuesta == "Band-Pass":
+        R1 = Rmax
+        R2 = Rmin
+        C1 = Csmall
+        C2 = Cbig
+        a2 = R1 * R2 * C1 * C2
+        a1 = C1 * (R1 + R2)
+        a0 = 1.0
+        num = [0.0, a1, 0.0]
+        den = [a2, a1, a0]
+        return signal.TransferFunction(num, den)
 
-    H(s) = 1 / (s^2 * R1 * R2 * C1 * C2 + s * C1 * (R1 + R2) + 1)
-    with R1 = Rmax, R2 = Rmin, C1 = Csmall, C2 = Cbig.
-    """
     R1 = Rmax
     R2 = Rmin
     C1 = Csmall
@@ -47,8 +68,9 @@ def generar_bode_sk_real_bytes(etapas, fc_global_hz, tipo_filtro, orden):
         Rmax = e["Rmax_real"]
         Csmall = e["Csmall"]
         Cbig = e["Cbig"]
+        resp_e = e.get("respuesta", "Low-Pass")
 
-        sys_i = transfer_func_etapa_sk(Rmax, Rmin, Csmall, Cbig)
+        sys_i = transfer_func_etapa_sk(Rmax, Rmin, Csmall, Cbig, respuesta=resp_e, m=e.get("m"))
         num_total = np.polymul(num_total, np.array(sys_i.num))
         den_total = np.polymul(den_total, np.array(sys_i.den))
 

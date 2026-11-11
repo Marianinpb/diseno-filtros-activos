@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+# Asegurar que 'src/' esté en sys.path sin necesidad de configurar PYTHONPATH en Mac/Linux/Windows
+_SRC_DIR = str(Path(__file__).resolve().parents[2])
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
+
 import flet as ft
 
 from filtros.search.search_best_filter import disenar_filtro_mfb_con_busqueda
@@ -13,6 +21,13 @@ TIPOS_FILTRO = [
 ]
 
 TOPOLOGIAS = ["MFB", "Sallen-Key"]
+
+RESPUESTAS = [
+    "Low-Pass",
+    "High-Pass",
+    "Band-Pass",
+    "Band-Pass (Cascada HP+LP)",
+]
 
 ORDENES = ["2", "4", "6", "8", "10"]
 
@@ -40,6 +55,33 @@ def main(page: ft.Page):
         value="1000",
         border_radius=8,
         keyboard_type=ft.KeyboardType.NUMBER,
+    )
+
+    fc2_input = ft.TextField(
+        label="Frecuencia de corte superior fH (Hz)",
+        value="5000",
+        border_radius=8,
+        keyboard_type=ft.KeyboardType.NUMBER,
+        visible=False,
+    )
+
+    def on_respuesta_change(e):
+        es_cascada = respuesta_dropdown.value == "Band-Pass (Cascada HP+LP)"
+        fc2_input.visible = es_cascada
+        if es_cascada:
+            fc_input.label = "Frecuencia de corte inferior fL (Hz)"
+        elif respuesta_dropdown.value == "Band-Pass":
+            fc_input.label = "Frecuencia central f0 (Hz)"
+        else:
+            fc_input.label = "Frecuencia de corte (Hz)"
+        page.update()
+
+    respuesta_dropdown = ft.Dropdown(
+        label="Respuesta del filtro",
+        value="Low-Pass",
+        border_radius=8,
+        options=[ft.dropdown.Option(r) for r in RESPUESTAS],
+        on_select=on_respuesta_change,
     )
 
     orden_dropdown = ft.Dropdown(
@@ -147,8 +189,21 @@ def main(page: ft.Page):
 
         tipo = tipo_dropdown.value
         topologia = topologia_dropdown.value
+        respuesta = respuesta_dropdown.value or "Low-Pass"
         path_yaml = yaml_path.value.strip()
         path_csv = tablas_path.value.strip()
+
+        fc2 = None
+        if respuesta == "Band-Pass (Cascada HP+LP)":
+            try:
+                fc2 = float(fc2_input.value)
+                if fc2 <= 0:
+                    raise ValueError()
+            except ValueError:
+                status_text.value = "Error: frecuencia superior fH no válida"
+                status_text.color = ft.Colors.RED_400
+                page.update()
+                return
 
         # Run search
         try:
@@ -159,6 +214,8 @@ def main(page: ft.Page):
                     tipo_filtro=tipo,
                     path_yaml=path_yaml,
                     path_csv_tablas=path_csv,
+                    respuesta=respuesta,
+                    fc2_hz=fc2,
                 )
             else:
                 resultados = disenar_filtro_sallen_key_con_busqueda(
@@ -167,6 +224,8 @@ def main(page: ft.Page):
                     tipo_filtro=tipo,
                     path_yaml=path_yaml,
                     path_csv_tablas=path_csv,
+                    respuesta=respuesta,
+                    fc2_hz=fc2,
                 )
         except Exception as ex:
             status_text.value = f"Error en cálculo: {ex}"
@@ -213,7 +272,9 @@ def main(page: ft.Page):
 
         # Generate Ideal Bode plot
         try:
-            ideal_bytes = generar_bode_ideal_bytes(fc, tipo, orden, path_csv)
+            ideal_bytes = generar_bode_ideal_bytes(
+                fc, tipo, orden, path_csv, respuesta=respuesta, fc2_hz=fc2
+            )
             ideal_image.src = f"data:image/png;base64,{ideal_bytes}"
             ideal_image.visible = True
         except Exception as ex:
@@ -223,7 +284,7 @@ def main(page: ft.Page):
         # Status summary
         ok_count = sum(1 for r in resultados if r["status"] == "ok")
         status_text.value = (
-            f"Calculado: {ok_count}/{len(resultados)} etapas {topologia} "
+            f"Calculado: {ok_count}/{len(resultados)} etapas {topologia} ({respuesta}) "
             f"para {tipo}, orden {orden}, fc={fc} Hz"
         )
         status_text.color = (
@@ -251,7 +312,9 @@ def main(page: ft.Page):
                 [
                     ft.Text("PARÁMETROS", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.INDIGO_200),
                     ft.Divider(height=1),
+                    respuesta_dropdown,
                     fc_input,
+                    fc2_input,
                     orden_dropdown,
                     topologia_dropdown,
                     tipo_dropdown,
