@@ -11,6 +11,10 @@ import flet as ft
 from filtros.search.search_best_filter import disenar_filtro_mfb_con_busqueda
 from filtros.search.search_best_filter_sk import disenar_filtro_sallen_key_con_busqueda
 from filtros.plot.bode_ideal_fig import generar_bode_ideal_bytes
+from filtros.plot.diagrama_etapa import (
+    generar_diagrama_etapa_bytes,
+    guardar_diagrama_etapa,
+)
 
 
 TIPOS_FILTRO = [
@@ -25,7 +29,6 @@ TOPOLOGIAS = ["MFB", "Sallen-Key"]
 RESPUESTAS = [
     "Low-Pass",
     "High-Pass",
-    "Band-Pass",
     "Band-Pass (Cascada HP+LP)",
 ]
 
@@ -70,8 +73,6 @@ def main(page: ft.Page):
         fc2_input.visible = es_cascada
         if es_cascada:
             fc_input.label = "Frecuencia de corte inferior fL (Hz)"
-        elif respuesta_dropdown.value == "Band-Pass":
-            fc_input.label = "Frecuencia central f0 (Hz)"
         else:
             fc_input.label = "Frecuencia de corte (Hz)"
         page.update()
@@ -154,8 +155,171 @@ def main(page: ft.Page):
 
     ideal_image = ft.Image(
         src=_BLANK_SRC,
-        fit="contain",
+        fit=ft.BoxFit.CONTAIN,
+        height=380,
         border_radius=10,
+        visible=False,
+    )
+
+    # ── Stage schematics (large stage-by-stage viewer) ─────────────
+    estado_actual = {
+        "etapas_ok": [],
+        "imagenes_b64": [],
+        "topologia": "MFB",
+        "respuesta": "Low-Pass",
+        "idx": 0,
+    }
+
+    diagramas_placeholder = ft.Text(
+        "Presiona Calcular para ver y descargar los diagramas etapa por etapa.",
+        size=12,
+        color=ft.Colors.GREY_400,
+    )
+
+    etapa_titulo_text = ft.Text(
+        "",
+        size=16,
+        weight=ft.FontWeight.BOLD,
+        color=ft.Colors.INDIGO_100,
+        text_align=ft.TextAlign.CENTER,
+    )
+
+    diagrama_image = ft.Image(
+        src=_BLANK_SRC,
+        height=420,
+        fit=ft.BoxFit.CONTAIN,
+        border_radius=10,
+        visible=False,
+    )
+
+    def _guardar_etapas_y_notificar(
+        etapas_a_guardar: list[dict], topologia_actual: str, resumen_ok: str
+    ) -> None:
+        try:
+            rutas_png = []
+            for etapa_item in etapas_a_guardar:
+                ruta_png = guardar_diagrama_etapa(
+                    etapa_item, topologia_actual, output_dir="output", fmt="png"
+                )
+                guardar_diagrama_etapa(
+                    etapa_item, topologia_actual, output_dir="output", fmt="svg"
+                )
+                rutas_png.append(ruta_png)
+            ruta_dir = str(Path(rutas_png[0]).resolve().parent)
+            msg = f"{resumen_ok} en: {ruta_dir}"
+            status_text.value = msg
+            status_text.color = ft.Colors.GREEN_400
+            page.show_dialog(ft.SnackBar(content=ft.Text(msg)))
+            page.update()
+        except Exception as ex:
+            msg = f"Error al guardar diagramas: {ex}"
+            status_text.value = msg
+            status_text.color = ft.Colors.RED_400
+            page.show_dialog(ft.SnackBar(content=ft.Text(msg)))
+            page.update()
+
+    def actualizar_vista_etapa(do_update: bool = True) -> None:
+        etapas = estado_actual["etapas_ok"]
+        imagenes = estado_actual["imagenes_b64"]
+        total = len(etapas)
+        if total == 0:
+            nav_row.visible = False
+            diagrama_image.visible = False
+            diagrama_image.src = _BLANK_SRC
+            diagramas_placeholder.visible = True
+            btn_guardar_actual.visible = False
+            boton_descargar_todos.visible = False
+            btn_prev_etapa.disabled = True
+            btn_next_etapa.disabled = True
+            etapa_titulo_text.value = ""
+        else:
+            idx = max(0, min(estado_actual["idx"], total - 1))
+            estado_actual["idx"] = idx
+            r = etapas[idx]
+            resp_etapa = r.get("respuesta", estado_actual["respuesta"])
+            topo = estado_actual["topologia"]
+            etapa_titulo_text.value = (
+                f"Etapa {r['etapa']} ({idx + 1} de {total} · {topo} - {resp_etapa}) — "
+                f"f0 = {r['f0_hz']:.4g} Hz, Q = {r['Q']:.4g}"
+            )
+            diagrama_image.src = f"data:image/png;base64,{imagenes[idx]}"
+            diagrama_image.visible = True
+            nav_row.visible = True
+            diagramas_placeholder.visible = False
+            btn_guardar_actual.visible = True
+            boton_descargar_todos.visible = True
+            btn_prev_etapa.disabled = idx <= 0
+            btn_next_etapa.disabled = idx >= total - 1
+
+        if do_update:
+            page.update()
+
+    def on_prev_etapa(ev):
+        if estado_actual["idx"] > 0:
+            estado_actual["idx"] -= 1
+            actualizar_vista_etapa()
+
+    def on_next_etapa(ev):
+        if estado_actual["idx"] < len(estado_actual["etapas_ok"]) - 1:
+            estado_actual["idx"] += 1
+            actualizar_vista_etapa()
+
+    def on_guardar_actual_click(ev):
+        etapas = estado_actual["etapas_ok"]
+        if not etapas:
+            page.show_dialog(ft.SnackBar(content=ft.Text("No hay etapa seleccionada.")))
+            return
+        r = etapas[estado_actual["idx"]]
+        _guardar_etapas_y_notificar(
+            [r],
+            estado_actual["topologia"],
+            f"Etapa {r['etapa']} guardada (PNG + SVG)",
+        )
+
+    def on_descargar_todos_click(ev):
+        etapas = estado_actual["etapas_ok"]
+        if not etapas:
+            page.show_dialog(
+                ft.SnackBar(content=ft.Text("No hay etapas válidas para guardar."))
+            )
+            return
+        _guardar_etapas_y_notificar(
+            etapas,
+            estado_actual["topologia"],
+            f"Guardados {len(etapas)} diagramas (PNG + SVG)",
+        )
+
+    btn_prev_etapa = ft.OutlinedButton(
+        "◀ Etapa anterior",
+        on_click=on_prev_etapa,
+        disabled=True,
+    )
+
+    btn_next_etapa = ft.OutlinedButton(
+        "Siguiente etapa ▶",
+        on_click=on_next_etapa,
+        disabled=True,
+    )
+
+    nav_row = ft.Row(
+        [btn_prev_etapa, etapa_titulo_text, btn_next_etapa],
+        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        wrap=True,
+        visible=False,
+    )
+
+    btn_guardar_actual = ft.FilledTonalButton(
+        "Guardar esta etapa (PNG + SVG)",
+        icon=ft.Icons.DOWNLOAD,
+        on_click=on_guardar_actual_click,
+        visible=False,
+    )
+
+    boton_descargar_todos = ft.OutlinedButton(
+        "Descargar todas (PNG + SVG)",
+        icon=ft.Icons.DOWNLOAD,
+        on_click=on_descargar_todos_click,
         visible=False,
     )
 
@@ -163,6 +327,10 @@ def main(page: ft.Page):
     def on_calcular_click(e):
         # Reset UI
         tabla.rows.clear()
+        estado_actual["etapas_ok"] = []
+        estado_actual["imagenes_b64"] = []
+        estado_actual["idx"] = 0
+        actualizar_vista_etapa(do_update=False)
         status_text.value = ""
         status_icon.visible = False
         ideal_image.visible = False
@@ -270,6 +438,25 @@ def main(page: ft.Page):
                 )
             tabla.rows.append(fila)
 
+        etapas_ok = []
+        imagenes_b64 = []
+        for r in resultados:
+            if r["status"] != "ok":
+                continue
+            try:
+                diag_b64 = generar_diagrama_etapa_bytes(r, topologia)
+                etapas_ok.append(r)
+                imagenes_b64.append(diag_b64)
+            except Exception as ex:
+                status_text.value = f"Etapa {r['etapa']} diagrama: {ex}"
+
+        estado_actual["etapas_ok"] = etapas_ok
+        estado_actual["imagenes_b64"] = imagenes_b64
+        estado_actual["topologia"] = topologia
+        estado_actual["respuesta"] = respuesta
+        estado_actual["idx"] = 0
+        actualizar_vista_etapa(do_update=False)
+
         # Generate Ideal Bode plot
         try:
             ideal_bytes = generar_bode_ideal_bytes(
@@ -341,18 +528,53 @@ def main(page: ft.Page):
                     ft.Row(
                         [tabla],
                         scroll=ft.ScrollMode.AUTO,
-                        expand=True,
                     ),
                 ],
                 spacing=12,
-                expand=True,
             ),
         ),
         elevation=4,
-        expand=True,
     )
 
-    # --- Bode plot card (bottom-right, single ideal plot) ---
+    # --- Stage diagram card (middle-right, large stage-by-stage view) ---
+    diagramas_card = ft.Card(
+        content=ft.Container(
+            padding=16,
+            content=ft.Column(
+                [
+                    ft.Row(
+                        [
+                            ft.Text(
+                                "DIAGRAMA DE ETAPA",
+                                size=16,
+                                weight=ft.FontWeight.BOLD,
+                                color=ft.Colors.INDIGO_200,
+                            ),
+                            ft.Row(
+                                [btn_guardar_actual, boton_descargar_todos],
+                                spacing=8,
+                                wrap=True,
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        wrap=True,
+                    ),
+                    ft.Divider(height=1),
+                    diagramas_placeholder,
+                    nav_row,
+                    ft.Container(
+                        content=diagrama_image,
+                        alignment=ft.Alignment.CENTER,
+                    ),
+                ],
+                spacing=12,
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+            ),
+        ),
+        elevation=4,
+    )
+
+    # --- Bode plot card (bottom-right) ---
     bode_card = ft.Card(
         content=ft.Container(
             padding=16,
@@ -360,24 +582,28 @@ def main(page: ft.Page):
                 [
                     ft.Text("BODE - MAGNITUD IDEAL", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.INDIGO_200),
                     ft.Divider(height=1),
-                    ideal_image,
+                    ft.Container(
+                        content=ideal_image,
+                        alignment=ft.Alignment.CENTER,
+                    ),
                 ],
                 spacing=12,
-                expand=True,
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             ),
         ),
         elevation=4,
-        expand=True,
     )
 
-    # Right panel: results on top, Bode plots below
+    # Right panel: full-width stacked cards with vertical scroll
     right_panel = ft.Column(
         [
-            ft.Container(content=results_card, expand=2),
-            ft.Container(content=bode_card, expand=3),
+            results_card,
+            diagramas_card,
+            bode_card,
         ],
         spacing=16,
         expand=True,
+        scroll=ft.ScrollMode.AUTO,
     )
 
     # ── Main layout ────────────────────────────────────────────────
@@ -390,6 +616,7 @@ def main(page: ft.Page):
             ],
             spacing=16,
             expand=True,
+            vertical_alignment=ft.CrossAxisAlignment.START,
         ),
     )
 
